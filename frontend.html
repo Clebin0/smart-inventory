@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Inventory</title>
+<style>
+:root{--bg:#0b0c0f;--panel:#15171b;--line:#2a2d33;--text:#f4f4f5;--muted:#9ca3af;--accent:#ff7a18}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,Segoe UI,sans-serif}
+.wrap{max-width:1220px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.brand{font-size:23px;font-weight:900;letter-spacing:.5px}.brand b{color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.num{font-size:30px;font-weight:900}.muted{color:var(--muted)}.panel{margin-top:14px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+input,select,button{background:#101216;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px}button{cursor:pointer}
+button.primary{background:var(--accent);color:#111;border-color:var(--accent);font-weight:800}.toolbar input{min-width:230px}
+table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:11px;border-bottom:1px solid var(--line);text-align:left}
+.pill{padding:4px 8px;border:1px solid var(--line);border-radius:20px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;width:min(620px,95vw)}
+dialog form{display:grid;gap:10px}.login{max-width:420px;margin:10vh auto}.hidden{display:none}
+video{width:100%;border-radius:12px;background:#000;max-height:320px}
+@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.wrap{padding:14px}table{font-size:12px}}
+</style>
+</head>
+<body>
+<div id="loginBox" class="login card">
+  <h1>Smart Inventory</h1>
+  <p class="muted">Informe o token de acesso configurado no ambiente.</p>
+  <input id="tokenInput" type="password" placeholder="APP_TOKEN" style="width:100%;margin:8px 0">
+  <button class="primary" onclick="login()" style="width:100%">Entrar</button>
+  <p class="muted">Ambiente local padrao: demo-token. Em producao, defina APP_TOKEN.</p>
+</div>
+
+<div id="app" class="wrap hidden">
+  <div class="top"><div class="brand">SMART <b>INVENTORY</b></div><button onclick="logout()">Sair</button></div>
+
+  <div class="grid">
+    <div class="card"><div class="muted">Ativos</div><div id="total" class="num">0</div></div>
+    <div class="card"><div class="muted">Disponiveis</div><div id="available" class="num">0</div></div>
+    <div class="card"><div class="muted">Em uso</div><div id="inuse" class="num">0</div></div>
+    <div class="card"><div class="muted">Manutencao</div><div id="maintenance" class="num">0</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <input id="q" placeholder="Buscar patrimonio, nome, serial ou responsavel">
+      <select id="status"><option value="">Todos os status</option><option value="available">Disponivel</option><option value="in_use">Em uso</option><option value="maintenance">Manutencao</option><option value="retired">Baixado</option></select>
+      <button onclick="loadAssets()">Buscar</button>
+      <button class="primary" onclick="assetDialog.showModal()">+ Novo ativo</button>
+      <button onclick="downloadCsv()">Exportar CSV</button>
+      <button onclick="openScanner()">Ler QR / Barcode</button>
+    </div>
+
+    <table>
+      <thead><tr><th>Patrimonio</th><th>Equipamento</th><th>Categoria</th><th>Local</th><th>Status</th><th>Responsavel</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="two">
+    <div class="panel"><h3>Insights assistidos</h3><div id="insights" class="muted">Carregando...</div></div>
+    <div class="panel"><h3>Localizar ativo</h3><p class="muted">Digite SMARTINV:ID ou o patrimonio.</p><div class="toolbar"><input id="scanText" placeholder="SMARTINV:12 ou PC001"><button onclick="resolveScan()">Abrir</button></div></div>
+  </div>
+</div>
+
+<dialog id="assetDialog">
+<form onsubmit="saveAsset(event)">
+<h3>Novo ativo</h3>
+<input id="tag" placeholder="Patrimonio" required>
+<input id="name" placeholder="Nome do equipamento" required>
+<input id="category" placeholder="Categoria" required>
+<input id="serial" placeholder="Numero de serie">
+<input id="location" placeholder="Local" value="Estoque">
+<input id="assigned" placeholder="Responsavel">
+<input id="notes" placeholder="Observacoes">
+<div><button type="button" onclick="assetDialog.close()">Cancelar</button> <button class="primary">Salvar</button></div>
+</form>
+</dialog>
+
+<dialog id="moveDialog">
+<form onsubmit="moveAsset(event)">
+<h3 id="moveTitle">Movimentar ativo</h3>
+<input type="hidden" id="moveId">
+<select id="action"><option value="check_out">Saida / Em uso</option><option value="check_in">Entrada / Disponivel</option><option value="transfer">Transferencia</option><option value="maintenance">Manutencao</option><option value="retire">Baixa</option></select>
+<input id="actor" placeholder="Quem esta registrando" required>
+<input id="destination" placeholder="Destino / local">
+<input id="moveAssigned" placeholder="Responsavel pelo ativo">
+<input id="moveNotes" placeholder="Observacoes">
+<div><button type="button" onclick="moveDialog.close()">Cancelar</button> <button class="primary">Registrar</button></div>
+</form>
+</dialog>
+
+<dialog id="scannerDialog">
+<h3>Leitor de QR / Barcode</h3>
+<video id="video" autoplay playsinline></video>
+<p id="scannerStatus" class="muted">Inicializando camera...</p>
+<button onclick="closeScanner()">Fechar</button>
+</dialog>
+
+<script>
+let token=localStorage.getItem("smart_token")||"";
+const headers=()=>({"Content-Type":"application/json","X-App-Token":token});
+async function api(url,opt={}){opt.headers={...(opt.headers||{}),...headers()};let r=await fetch(url,opt);if(r.status===401){logout();throw Error("Token invalido")}if(!r.ok){let j=await r.json().catch(()=>({detail:"Erro"}));throw Error(j.detail||"Erro")}return r}
+function login(){token=tokenInput.value.trim();localStorage.setItem("smart_token",token);showApp()}
+function logout(){localStorage.removeItem("smart_token");token="";app.classList.add("hidden");loginBox.classList.remove("hidden")}
+function showApp(){loginBox.classList.add("hidden");app.classList.remove("hidden");loadDashboard();loadAssets();loadInsights()}
+
+async function loadDashboard(){try{let d=await (await api("/dashboard")).json();total.textContent=d.total_assets;available.textContent=d.by_status.available||0;inuse.textContent=d.by_status.in_use||0;maintenance.textContent=d.by_status.maintenance||0}catch(e){}}
+async function loadAssets(){
+  let u="/assets?q="+encodeURIComponent(q.value)+"&status="+encodeURIComponent(status.value);
+  let a=await (await api(u)).json();
+  rows.innerHTML=a.map(x=>`<tr><td><b>${x.tag}</b></td><td>${x.name}<br><span class="muted">${x.serial_number||""}</span></td><td>${x.category}</td><td>${x.location}</td><td><span class="pill">${x.status}</span></td><td>${x.assigned_to||"-"}</td><td><button onclick="openMove(${x.id},'${x.tag}')">Movimentar</button> <a href="/assets/${x.id}/qr" target="_blank">QR</a></td></tr>`).join("")
+}
+async function saveAsset(e){
+  e.preventDefault();
+  let body={tag:tag.value,name:name.value,category:category.value,serial_number:serial.value||null,location:location.value,status:"available",assigned_to:assigned.value||null,notes:notes.value||null};
+  try{await api("/assets",{method:"POST",body:JSON.stringify(body)});assetDialog.close();e.target.reset();location.value="Estoque";loadDashboard();loadAssets()}catch(x){alert(x.message)}
+}
+function openMove(id,tagv){moveId.value=id;moveTitle.textContent="Movimentar "+tagv;moveDialog.showModal()}
+async function moveAsset(e){
+  e.preventDefault();
+  let body={action:action.value,actor:actor.value,destination:destination.value||null,assigned_to:moveAssigned.value||null,notes:moveNotes.value||null};
+  try{await api("/assets/"+moveId.value+"/movements",{method:"POST",body:JSON.stringify(body)});moveDialog.close();e.target.reset();loadDashboard();loadAssets();loadInsights()}catch(x){alert(x.message)}
+}
+async function loadInsights(){try{let d=await (await api("/insights")).json();insights.innerHTML=d.insights.map(x=>"â€¢ "+x).join("<br>")}catch(e){}}
+function downloadCsv(){fetch("/export.csv",{headers:headers()}).then(r=>r.blob()).then(b=>{let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="smart-inventory.csv";a.click()})}
+async function resolveScan(){
+  let v=scanText.value.trim(),a;
+  if(v.startsWith("SMARTINV:")){a=await (await api("/assets/"+v.split(":")[1])).json()}
+  else{let list=await (await api("/assets?q="+encodeURIComponent(v))).json();a=list[0]}
+  if(!a)return alert("Ativo nao encontrado");openMove(a.id,a.tag)
+}
+let stream=null,scanTimer=null;
+async function openScanner(){
+  scannerDialog.showModal();
+  if(!("BarcodeDetector" in window)){scannerStatus.textContent="BarcodeDetector nao suportado neste navegador. Use a leitura manual.";return}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    video.srcObject=stream; const detector=new BarcodeDetector();
+    scanTimer=setInterval(async()=>{try{let codes=await detector.detect(video);if(codes.length){scanText.value=codes[0].rawValue;closeScanner();resolveScan()}}catch(e){}},700)
+  }catch(e){scannerStatus.textContent="Nao foi possivel acessar a camera."}
+}
+function closeScanner(){if(scanTimer)clearInterval(scanTimer);if(stream)stream.getTracks().forEach(t=>t.stop());scannerDialog.close()}
+if(token)showApp();
+</script>
+</body>
+</html>
