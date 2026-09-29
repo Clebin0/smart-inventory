@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import DateTime, ForeignKey, String, create_engine, func, or_, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from risk_engine import score_asset
 
 DATABASE_URL=os.getenv("DATABASE_URL","sqlite:///inventory.db")
 APP_TOKEN=os.getenv("APP_TOKEN","demo-token")
@@ -78,7 +79,7 @@ def guard(x_app_token:str|None=Header(default=None)):
     if APP_TOKEN and x_app_token!=APP_TOKEN:
         raise HTTPException(401,"Invalid application token")
 
-app=FastAPI(title="Smart Inventory",version="2.0.0")
+app=FastAPI(title="Smart Inventory",version="2.1.0")
 
 @app.get("/",response_class=HTMLResponse)
 def home():
@@ -87,7 +88,7 @@ def home():
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"2.0.0"}
+    return {"status":"ok","version":"2.1.0"}
 
 @app.get("/assets",dependencies=[Depends(guard)])
 def list_assets(q:str="",status:str="",category:str="",location:str="",s:Session=Depends(db)):
@@ -193,6 +194,23 @@ def insights(s:Session=Depends(db)):
     if not tips:
         tips.append("No obvious operational anomalies in the current inventory.")
     return {"engine":"rules-v1","human_review_required":True,"insights":tips}
+
+
+@app.get("/risk",dependencies=[Depends(guard)])
+def risk_dashboard(s:Session=Depends(db)):
+    assets=s.scalars(select(Asset).order_by(Asset.id.desc())).all()
+    rows=[]
+    for a in assets:
+        movements=s.scalars(select(Movement).where(Movement.asset_id==a.id).order_by(Movement.created_at.desc())).all()
+        risk=score_asset(a,len(movements),movements[0].created_at if movements else None)
+        rows.append({"asset_id":a.id,"tag":a.tag,"name":a.name,"status":a.status,**risk})
+    rows.sort(key=lambda x:x["score"],reverse=True)
+    return {
+      "engine":"interpretable-lifecycle-risk-v1",
+      "note":"Operational risk score based on explicit rules; not a predictive ML probability.",
+      "high_risk":sum(1 for r in rows if r["level"]=="high"),
+      "assets":rows
+    }
 
 @app.get("/export.csv",dependencies=[Depends(guard)])
 def export_csv(s:Session=Depends(db)):

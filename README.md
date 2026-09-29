@@ -1,46 +1,47 @@
 # Smart Inventory
 
-Aplicacao de portfolio para gestao de ativos de TI com rastreabilidade de movimentacoes.
+Aplicação de portfólio para gestão de ativos de TI com rastreabilidade de movimentações e análise de risco operacional explicável.
 
-## Principais recursos
+## Recursos
 
-- Dashboard com total de ativos e status
-- Cadastro e edicao via API
-- Patrimonio, numero de serie, categoria, local e responsavel
-- Entrada, saida, transferencia, manutencao e baixa
-- Historico de movimentacoes
-- QR Code individual por ativo
-- Leitura de QR/barcode pela camera quando o navegador oferece BarcodeDetector
-- Busca e filtros
-- Exportacao CSV
-- Insights operacionais baseados em regras
-- SQLite para desenvolvimento e PostgreSQL por variavel de ambiente
-- Docker e Docker Compose
-- Protecao simples por APP_TOKEN
+- dashboard de ativos e status
+- cadastro, edição, pesquisa e filtros
+- patrimônio, serial, categoria, local e responsável
+- entrada, saída, transferência, manutenção e baixa
+- histórico de movimentações
+- QR Code individual e leitura por câmera quando suportado
+- exportação CSV
+- SQLite para desenvolvimento e PostgreSQL por `DATABASE_URL`
+- Docker / Docker Compose
+- proteção simples por `APP_TOKEN`
+- **lifecycle risk score** por ativo
 
-## Rodar localmente
+## Lifecycle Risk
+
+O endpoint `GET /risk` calcula um score de 0 a 100 usando regras explícitas, como:
+
+- ativo em manutenção
+- ativo em uso sem responsável
+- serial ausente
+- frequência alta de movimentações
+- manutenção sem movimentação há mais de 14 dias
+
+O score é deliberadamente **interpretável** e não é apresentado como probabilidade de falha. Um modelo preditivo real exigiria histórico suficiente, rótulos confiáveis e validação.
+
+## Executar
 
 ```bash
 python -m venv .venv
-.venv\\Scripts\\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 set APP_TOKEN=demo-token
 uvicorn app:app --reload
 ```
 
-Abra http://127.0.0.1:8000 e use o token configurado.
-
-## Docker
-
-```bash
-docker compose up --build
-```
+Abra `http://127.0.0.1:8000`.
 
 ## API
 
-A documentacao interativa fica em `/docs`.
-
-Endpoints principais:
 - `GET /dashboard`
 - `GET /assets`
 - `POST /assets`
@@ -48,11 +49,10 @@ Endpoints principais:
 - `POST /assets/{id}/movements`
 - `GET /assets/{id}/movements`
 - `GET /assets/{id}/qr`
+- `GET /risk`
 - `GET /insights`
 - `GET /export.csv`
 
-## Seguranca
+## Segurança
 
-Este projeto usa um token simples para demonstracao. Para uso corporativo real, a autenticacao deve ser substituida por identidade corporativa, RBAC, logs de auditoria e gerenciamento seguro de segredos.
-
-Nenhum dado corporativo real e versionado neste repositorio.
+O token atual é adequado apenas para demonstração. Uso corporativo real deve adotar identidade corporativa, RBAC, auditoria e gerenciamento seguro de segredos. Nenhum dado corporativo real é versionado.
