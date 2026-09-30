@@ -2,19 +2,21 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: inventory
-      POSTGRES_USER: inventory
-      POSTGRES_PASSWORD: inventory
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+
   app:
     build: .
     ports:
       - "8000:8000"
     environment:
-      APP_TOKEN: change-this-token
-      DATABASE_URL: postgresql+psycopg://inventory:inventory@db:5432/inventory
+      APP_TOKEN: ${APP_TOKEN}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     depends_on:
       - db
+
 volumes:
   pgdata:
