@@ -1,34 +1,29 @@
-# Architecture
+# Arquitetura
 
-## Goal
-
-Smart Inventory tracks the lifecycle of IT assets, their movements and operational risk using an auditable rule-based score.
-
-## Flow
+O fluxo principal é simples: cadastrar o ativo, registrar cada movimentação e manter um histórico que possa ser consultado depois.
 
 ```mermaid
 flowchart LR
-    A[Web client / scanner] --> B[FastAPI]
-    B --> C[Token guard]
-    C --> D[Asset service]
-    C --> E[Movement service]
+    A[Web / leitor de QR] --> B[FastAPI]
+    B --> C[Validação do token]
+    C --> D[Ativos]
+    C --> E[Movimentações]
     D --> F[(SQLite / PostgreSQL)]
     E --> F
     F --> G[Dashboard]
-    F --> H[QR code endpoint]
-    F --> I[Risk engine]
-    I --> J[Explainable risk score]
-    F --> K[CSV export]
+    F --> H[QR Code]
+    F --> I[Análise de risco]
+    F --> J[Exportação CSV]
 ```
 
-## Domain model
+## Dados
 
-An `Asset` stores identity, category, location, status and assignment. A `Movement` creates an auditable event trail for check-out, check-in, transfers, maintenance and retirement.
+`Asset` guarda patrimônio, serial, categoria, local, status e responsável.
 
-## Security boundary
+`Movement` registra entrada, saída, transferência, manutenção e baixa. A ideia é não perder o histórico quando um equipamento muda de lugar ou de responsável.
 
-The current `APP_TOKEN` mechanism is intentionally simple for portfolio use. Production use should replace it with SSO/OIDC, RBAC, audit logs, secret management and scoped service identities.
+## Autenticação
 
-## Evolution path
+Hoje o projeto usa `APP_TOKEN` porque é suficiente para rodar o laboratório. Em uso real isso teria que ser substituído por autenticação de usuário, permissões e auditoria.
 
-The natural next step is event-driven inventory processing: QR/barcode scan -> movement event -> validation -> persisted history -> anomaly/risk analysis.
+O caminho que quero explorar depois é registrar a movimentação direto pela leitura de QR Code ou código de barras.
