@@ -95,9 +95,9 @@ class AssetIn(InputModel):
     @model_validator(mode="after")
     def validate_assignee_matches_status(self):
         if self.status == AssetStatus.in_use and not self.assigned_to:
-            raise ValueError("An in-use asset must have an assigned person")
+            raise ValueError("Um ativo em uso precisa ter um responsável.")
         if self.status != AssetStatus.in_use and self.assigned_to:
-            raise ValueError("Only in-use assets can have an assigned person")
+            raise ValueError("Somente ativos em uso podem ter um responsável.")
         return self
 
 
@@ -111,9 +111,9 @@ class MovementIn(InputModel):
     @model_validator(mode="after")
     def validate_action_requirements(self):
         if self.action == Action.transfer and not self.destination:
-            raise ValueError("A destination is required for a transfer")
+            raise ValueError("Informe o destino para registrar uma transferência.")
         if self.action == Action.check_out and not self.assigned_to:
-            raise ValueError("An assignee is required when checking out an asset")
+            raise ValueError("Informe o responsável ao registrar a saída do ativo.")
         return self
 
 
@@ -124,9 +124,9 @@ def db():
 
 def guard(x_app_token: str | None = Header(default=None)):
     if not APP_TOKEN:
-        raise HTTPException(503, "Application token is not configured")
+        raise HTTPException(503, "O token da aplicação não está configurado.")
     if not x_app_token or not hmac.compare_digest(x_app_token, APP_TOKEN):
-        raise HTTPException(401, "Invalid application token")
+        raise HTTPException(401, "Token de acesso inválido.")
 
 
 app = FastAPI(title="Smart Inventory", version="2.2.0")
@@ -179,7 +179,7 @@ def create_asset(body: AssetIn, session: Session = Depends(db)):
         session.commit()
     except IntegrityError as exc:
         session.rollback()
-        raise HTTPException(409, "Asset tag already exists") from exc
+        raise HTTPException(409, "Já existe um ativo com esse número de patrimônio.") from exc
     session.refresh(asset)
     return asset
 
@@ -188,7 +188,7 @@ def create_asset(body: AssetIn, session: Session = Depends(db)):
 def get_asset(asset_id: int, session: Session = Depends(db)):
     asset = session.get(Asset, asset_id)
     if not asset:
-        raise HTTPException(404, "Asset not found")
+        raise HTTPException(404, "Ativo não encontrado.")
     return asset
 
 
@@ -196,19 +196,19 @@ def get_asset(asset_id: int, session: Session = Depends(db)):
 def update_asset(asset_id: int, body: AssetIn, session: Session = Depends(db)):
     asset = session.get(Asset, asset_id)
     if not asset:
-        raise HTTPException(404, "Asset not found")
+        raise HTTPException(404, "Ativo não encontrado.")
 
     if body.status.value != asset.status or body.assigned_to != asset.assigned_to:
         raise HTTPException(
             409,
-            "Status and assignee changes must use the movements endpoint to preserve history",
+            "Alterações de status e responsável devem ser registradas em movimentações para preservar o histórico.",
         )
 
     duplicate = session.scalar(
         select(Asset).where(Asset.tag == body.tag, Asset.id != asset_id)
     )
     if duplicate:
-        raise HTTPException(409, "Asset tag already exists")
+        raise HTTPException(409, "Já existe um ativo com esse número de patrimônio.")
 
     data = body.model_dump(exclude={"status", "assigned_to"})
     for key, value in data.items():
@@ -226,22 +226,22 @@ def update_asset(asset_id: int, body: AssetIn, session: Session = Depends(db)):
 def move(asset_id: int, body: MovementIn, session: Session = Depends(db)):
     asset = session.get(Asset, asset_id)
     if not asset:
-        raise HTTPException(404, "Asset not found")
+        raise HTTPException(404, "Ativo não encontrado.")
 
     current_status = AssetStatus(asset.status)
 
     if current_status == AssetStatus.retired:
-        raise HTTPException(409, "Retired assets cannot be moved")
+        raise HTTPException(409, "Ativos baixados não podem receber novas movimentações.")
 
     if body.action == Action.check_out:
         if current_status != AssetStatus.available:
-            raise HTTPException(409, "Only available assets can be checked out")
+            raise HTTPException(409, "Somente ativos disponíveis podem receber uma saída.")
         asset.status = AssetStatus.in_use.value
         asset.assigned_to = body.assigned_to
 
     elif body.action == Action.check_in:
         if current_status != AssetStatus.in_use:
-            raise HTTPException(409, "Only in-use assets can be checked in")
+            raise HTTPException(409, "Somente ativos em uso podem receber uma entrada.")
         asset.status = AssetStatus.available.value
         asset.assigned_to = None
 
@@ -276,7 +276,7 @@ def move(asset_id: int, body: MovementIn, session: Session = Depends(db)):
 @app.get("/assets/{asset_id}/movements", dependencies=[Depends(guard)])
 def history(asset_id: int, session: Session = Depends(db)):
     if not session.get(Asset, asset_id):
-        raise HTTPException(404, "Asset not found")
+        raise HTTPException(404, "Ativo não encontrado.")
     return session.scalars(
         select(Movement)
         .where(Movement.asset_id == asset_id)
@@ -287,7 +287,7 @@ def history(asset_id: int, session: Session = Depends(db)):
 @app.get("/assets/{asset_id}/qr")
 def qr(asset_id: int, session: Session = Depends(db)):
     if not session.get(Asset, asset_id):
-        raise HTTPException(404, "Asset not found")
+        raise HTTPException(404, "Ativo não encontrado.")
     image = qrcode.make(f"SMARTINV:{asset_id}")
     buffer = BytesIO()
     image.save(buffer, format="PNG")
@@ -360,13 +360,13 @@ def insights(session: Session = Depends(db)):
 
     tips = []
     if maintenance:
-        tips.append(f"{maintenance} asset(s) in maintenance: review downtime and owner.")
+        tips.append(f"{maintenance} ativo(s) em manutenção. Confira o tempo parado e o responsável pela tratativa.")
     if unassigned:
-        tips.append(f"{unassigned} asset(s) in use without an assigned person.")
+        tips.append(f"{unassigned} ativo(s) em uso sem responsável associado.")
     if retired and total and retired / total > 0.15:
-        tips.append("More than 15 percent of assets are retired; review lifecycle planning.")
+        tips.append("Mais de 15% do inventário está baixado; revise os critérios de reposição.")
     if not tips:
-        tips.append("No obvious operational anomalies in the current inventory.")
+        tips.append("Nenhuma pendência foi identificada pelas regras atuais.")
 
     return {"engine": "rules-v1", "human_review_required": True, "insights": tips}
 
@@ -398,8 +398,8 @@ def risk_dashboard(session: Session = Depends(db)):
 
     rows.sort(key=lambda item: item["score"], reverse=True)
     return {
-        "engine": "interpretable-lifecycle-risk-v1",
-        "note": "Operational risk score based on explicit rules; not a predictive ML probability.",
+        "engine": "regras-ciclo-de-vida-v1",
+        "note": "Pontuação operacional baseada em regras; não representa probabilidade preditiva.",
         "high_risk": sum(1 for row in rows if row["level"] == "high"),
         "assets": rows,
     }

@@ -1,29 +1,40 @@
-# Arquitetura
+# Organização do Smart Inventory
 
-O fluxo principal é simples: cadastrar o ativo, registrar cada movimentação e manter um histórico que possa ser consultado depois.
+A regra que orienta o desenho é simples: **mudança de estado precisa deixar um registro**.
+
+## Caminho de uma movimentação
 
 ```mermaid
-flowchart LR
-    A[Web / leitor de QR] --> B[FastAPI]
-    B --> C[Validação do token]
-    C --> D[Ativos]
-    C --> E[Movimentações]
-    D --> F[(SQLite / PostgreSQL)]
-    E --> F
-    F --> G[Dashboard]
-    F --> H[QR Code]
-    F --> I[Análise de risco]
-    F --> J[Exportação CSV]
+flowchart TD
+    A[Operador seleciona o ativo] --> B[POST /assets/id/movements]
+    B --> C{Ativo existe e transição é válida?}
+    C -- Não --> D[HTTP 404 ou 409]
+    C -- Sim --> E[Atualiza status, local e responsável]
+    E --> F[Grava Movement]
+    F --> G[Histórico e dashboard]
 ```
 
-## Dados
+## Estrutura dos dados
 
-`Asset` guarda patrimônio, serial, categoria, local, status e responsável.
+- `Asset`: identificação patrimonial, nome, categoria, número de série, local, status e responsável atual.
+- `Movement`: ativo relacionado, operação, operador, destino, responsável resultante, observação e data.
 
-`Movement` registra entrada, saída, transferência, manutenção e baixa. A ideia é não perder o histórico quando um equipamento muda de lugar ou de responsável.
+A tabela de movimentações é o histórico operacional. O registro do ativo guarda a situação atual para facilitar consultas e filtros.
 
-## Autenticação
+## Regras de transição
 
-Hoje o projeto usa `APP_TOKEN` porque é suficiente para rodar o laboratório. Em uso real isso teria que ser substituído por autenticação de usuário, permissões e auditoria.
+| Operação | Estado exigido | Efeito |
+|---|---|---|
+| Saída | Disponível | Passa para em uso e recebe responsável |
+| Entrada | Em uso | Volta para disponível e limpa o responsável |
+| Transferência | Não baixado | Atualiza a localização |
+| Manutenção | Não baixado | Passa para manutenção |
+| Baixa | Não baixado | Passa para baixado |
 
-O caminho que quero explorar depois é registrar a movimentação direto pela leitura de QR Code ou código de barras.
+Ativos baixados não podem ser movimentados. A edição de metadados também rejeita mudanças diretas de status ou responsável.
+
+## Persistência e autenticação
+
+SQLite é o padrão local; PostgreSQL pode ser selecionado por `DATABASE_URL`. O acesso às rotas de dados usa o header `X-App-Token`, comparado em tempo constante. É uma proteção suficiente para o ambiente de laboratório, não um sistema de identidade corporativa.
+
+O projeto ainda não implementa migrações versionadas, controle de concorrência entre operadores ou separação de dados por organização.

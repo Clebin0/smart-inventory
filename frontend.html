@@ -55,7 +55,7 @@
       <article class="card"><div class="metric-label">Total de ativos</div><div id="total" class="metric">0</div><div class="metric-foot">Patrimônio cadastrado</div></article>
       <article class="card"><div class="metric-label">Disponíveis</div><div id="available" class="metric">0</div><div class="metric-foot">Prontos para alocação</div></article>
       <article class="card"><div class="metric-label">Em uso</div><div id="inuse" class="metric">0</div><div class="metric-foot">Com responsável</div></article>
-      <article class="card"><div class="metric-label">Alto risco</div><div id="highRisk" class="metric">0</div><div class="metric-foot">Precisam de revisão</div></article>
+      <article class="card"><div class="metric-label">Atenção alta</div><div id="highRisk" class="metric">0</div><div class="metric-foot">Precisam de revisão</div></article>
     </section>
 
     <section class="panel">
@@ -69,14 +69,14 @@
     </section>
 
     <section class="two">
-      <article class="panel"><div class="panel-head"><h3>Insights assistidos</h3><span class="eyebrow">Regras</span></div><div id="insights" class="insight-list"><span class="muted">Carregando…</span></div></article>
+      <article class="panel"><div class="panel-head"><h3>Pendências operacionais</h3><span class="eyebrow">Verificar</span></div><div id="insights" class="insight-list"><span class="muted">Carregando…</span></div></article>
       <article class="panel"><div class="panel-head"><h3>Localizar ativo</h3><span class="eyebrow">QR / Patrimônio</span></div><p class="muted">Informe um código no formato SMARTINV:ID ou o número do patrimônio.</p><div class="toolbar"><input id="scanText" class="search" placeholder="SMARTINV:12 ou PC001" aria-label="Código do ativo"><button id="resolveButton" type="button">Localizar</button></div></article>
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h3>Lifecycle risk</h3><span class="eyebrow">Score explicável</span></div>
+      <div class="panel-head"><h3>Sinais do ciclo de vida</h3><span class="eyebrow">Regras de atenção</span></div>
       <p class="muted">Pontuação baseada em regras explícitas de cadastro, status e histórico. Não representa probabilidade preditiva de falha.</p>
-      <div class="table-wrap"><table><thead><tr><th>Ativo</th><th>Status</th><th>Score</th><th>Nível</th><th>Sinais identificados</th></tr></thead><tbody id="riskRows"><tr><td colspan="5" class="empty">Carregando análise…</td></tr></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Ativo</th><th>Status</th><th>Pontuação</th><th>Nível</th><th>Sinais identificados</th></tr></thead><tbody id="riskRows"><tr><td colspan="5" class="empty">Carregando análise…</td></tr></tbody></table></div>
     </section>
     <footer class="footer">Smart Inventory · Laboratório de gestão de ativos e rastreabilidade</footer>
   </main>
