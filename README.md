@@ -1,77 +1,93 @@
-<div align="center">
-
 # Smart Inventory
 
-**Gestão de ativos · QR Code · Auditoria · Risk Scoring**
+Gestão de ativos de TI com rastreabilidade de movimentações, QR Code e análise explicável de risco operacional.
 
-<img src="https://img.shields.io/badge/Python-000000?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-<img src="https://img.shields.io/badge/FastAPI-000000?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-<img src="https://img.shields.io/badge/PostgreSQL-000000?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
-<img src="https://img.shields.io/badge/Docker-000000?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+## Visão geral
 
-</div>
+O Smart Inventory centraliza o ciclo de vida de equipamentos: cadastro patrimonial, localização, responsável, movimentações, histórico e exportação. A aplicação usa FastAPI e SQLAlchemy, com SQLite no desenvolvimento e PostgreSQL via DATABASE_URL.
 
----
+## Demonstração
 
-Aplicação de portfólio para gestão de ativos de TI com rastreabilidade de movimentações e análise explicável de risco operacional.
+![Smart Inventory dashboard](docs/screenshots/dashboard.png)
 
-## Recursos
+A captura usa seis ativos inteiramente fictícios e demonstra estados disponíveis, em uso e manutenção.
 
-- dashboard de ativos e status;
-- cadastro, edição, pesquisa e filtros;
-- patrimônio, serial, categoria, local e responsável;
-- entrada, saída, transferência, manutenção e baixa;
-- histórico de movimentações;
-- QR Code individual;
-- leitura por câmera quando suportado;
-- exportação CSV;
-- SQLite em desenvolvimento e PostgreSQL por <code>DATABASE_URL</code>;
-- Docker / Docker Compose;
-- score de risco por ciclo de vida.
+## Funcionalidades
 
-## Lifecycle Risk
+- Cadastro, pesquisa e filtragem de equipamentos.
+- Histórico auditável de saída, entrada, transferência, manutenção e baixa.
+- Regras de transição: não permite saída de equipamento indisponível, entrada de equipamento que não está em uso ou movimentação de ativo baixado.
+- Alterações de status e responsável precisam passar pelo endpoint de movimentações.
+- QR Code individual e leitor por câmera quando o navegador oferece BarcodeDetector.
+- Dashboard, exportação CSV e insights operacionais.
+- Lifecycle Risk com regras explícitas e motivos por ativo.
+- Token de demonstração via header X-App-Token.
 
-O endpoint <code>GET /risk</code> calcula um score de 0 a 100 usando regras explícitas, como:
+## Stack
 
-- ativo em manutenção;
-- ativo em uso sem responsável;
-- serial ausente;
-- frequência alta de movimentações;
-- manutenção sem movimentação há mais de 14 dias.
+- Python 3.12+
+- FastAPI e Pydantic
+- SQLAlchemy
+- SQLite / PostgreSQL
+- Docker e Docker Compose
+- pytest e TestClient
 
-O score é interpretável e não é apresentado como probabilidade de falha.
+## Executar localmente
 
-## Executar
+Windows PowerShell:
 
-~~~bash
+~~~powershell
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-set APP_TOKEN=demo-token
+$env:APP_TOKEN = "local-demo-token"
 uvicorn app:app --reload
 ~~~
 
-## API
+Abra http://127.0.0.1:8000. O token informado no terminal deve ser usado na tela de login.
 
-- <code>GET /dashboard</code>
-- <code>GET /assets</code>
-- <code>POST /assets</code>
-- <code>PUT /assets/{id}</code>
-- <code>POST /assets/{id}/movements</code>
-- <code>GET /assets/{id}/movements</code>
-- <code>GET /assets/{id}/qr</code>
-- <code>GET /risk</code>
-- <code>GET /insights</code>
-- <code>GET /export.csv</code>
+## Docker Compose
 
-## Segurança
+Copie .env.example para .env, substitua os valores de demonstração e execute:
 
-O token atual serve apenas para demonstração. Uso corporativo deve adotar identidade corporativa, RBAC, auditoria e gerenciamento seguro de segredos. Nenhum dado corporativo real deve ser versionado.
+~~~bash
+docker compose up --build
+~~~
 
----
+O serviço web fica em http://localhost:8000. Não use os valores ilustrativos do arquivo .env.example em ambientes públicos.
 
-<div align="center">
+## Testes
 
-Inventário técnico com foco em rastreabilidade antes de “planilha_final_v7_agora_vai.xlsx”.
+~~~bash
+python -m pytest -q
+python -m compileall -q .
+~~~
 
-</div>
+Os testes cobrem autenticação por token, ciclo de movimentação, consistência do histórico, validação de transferência e bloqueio de alteração de status fora do fluxo auditável.
+
+## API principal
+
+| Método | Rota | Objetivo |
+|---|---|---|
+| GET | /health | Estado da aplicação |
+| GET | /dashboard | Indicadores e movimentações recentes |
+| GET | /assets | Pesquisa e filtros |
+| POST | /assets | Cadastro |
+| GET | /assets/{id} | Detalhes |
+| PUT | /assets/{id} | Atualização de metadados |
+| POST | /assets/{id}/movements | Registrar movimentação |
+| GET | /assets/{id}/movements | Histórico |
+| GET | /assets/{id}/qr | QR Code |
+| GET | /risk | Score por ativo |
+| GET | /insights | Alertas baseados em regras |
+| GET | /export.csv | Exportação |
+
+As rotas de dados exigem o header X-App-Token. O endpoint de QR Code gera somente um identificador técnico e não substitui a autenticação da API.
+
+## Segurança e limitações
+
+O token simples é adequado apenas para laboratório. Uma implantação real precisa de autenticação corporativa, RBAC, rotação de segredos, trilha de auditoria protegida, migrações versionadas e controles de acesso por organização.
+
+O score de risco é determinístico e baseado em regras. Não representa probabilidade estatística de falha. A leitura de QR pela câmera depende do suporte do navegador e de contexto seguro (HTTPS ou localhost).
+
+Todos os dados usados em demonstrações devem ser fictícios.

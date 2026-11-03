@@ -2,5 +2,5 @@
 __pycache__/
 *.pyc
 .env
-inventory.db
+*.db
 .pytest_cache/
